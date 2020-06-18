@@ -1,0 +1,108 @@
+
+---
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.2.4
+  creationTimestamp: null
+  name: dlexperiments.mlhub.njuics.cn
+spec:
+  group: mlhub.njuics.cn
+  names:
+    kind: DLExperiment
+    listKind: DLExperimentList
+    plural: dlexperiments
+    singular: dlexperiment
+  scope: Namespaced
+  validation:
+    openAPIV3Schema:
+      description: DLExperiment is the Schema for the dlexperiments API
+      properties:
+        apiVersion:
+          description: 'APIVersion defines the versioned schema of this representation
+            of an object. Servers should convert recognized schemas to the latest
+            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+          type: string
+        kind:
+          description: 'Kind is a string value representing the REST resource this
+            object represents. Servers may infer this from the endpoint the client
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+          type: string
+        metadata:
+          type: object
+        spec:
+          description: DLExperimentSpec defines the desired state of DLExperiment
+          properties:
+            command:
+              type: string
+            datasets:
+              items:
+                type: string
+              type: array
+            gpu_num:
+              type: integer
+            mysql_secret:
+              type: string
+            num:
+              type: integer
+            search_space:
+              type: string
+            target:
+              type: string
+            trainer:
+              type: string
+            trial_concurrency:
+              type: integer
+            trial_image:
+              type: string
+            tuner:
+              type: string
+            tuner_image:
+              type: string
+            user:
+              description: Foo is an example field of DLExperiment. Edit DLExperiment_types.go
+                to remove/update
+              type: string
+            working_dir:
+              type: string
+            workspace:
+              type: string
+          required:
+          - command
+          - datasets
+          - gpu_num
+          - mysql_secret
+          - num
+          - search_space
+          - target
+          - trainer
+          - trial_concurrency
+          - trial_image
+          - tuner
+          - tuner_image
+          - user
+          - working_dir
+          - workspace
+          type: object
+        status:
+          description: DLExperimentStatus defines the observed state of DLExperiment
+          properties:
+            status:
+              description: 'INSERT ADDITIONAL STATUS FIELD - define observed state
+                of cluster Important: Run "make" to regenerate code after modifying
+                this file'
+              type: string
+          type: object
+      type: object
+  version: v1
+  versions:
+  - name: v1
+    served: true
+    storage: true
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []

@@ -1,0 +1,7 @@
+apiVersion: mlhub.njuics.cn/v1
+kind: DLExperiment
+metadata:
+  name: dlexperiment-sample
+spec:
+  # Add fields here
+  foo: bar

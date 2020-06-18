@@ -1,0 +1,20 @@
+# permissions for end users to view dlexperiments.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: dlexperiment-viewer-role
+rules:
+- apiGroups:
+  - mlhub.njuics.cn
+  resources:
+  - dlexperiments
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - mlhub.njuics.cn
+  resources:
+  - dlexperiments/status
+  verbs:
+  - get

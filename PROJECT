@@ -1,0 +1,7 @@
+domain: njuics.cn
+repo: github.com/nemoworks/dl-experiment
+resources:
+- group: mlhub
+  kind: DLExperiment
+  version: v1
+version: "2"
