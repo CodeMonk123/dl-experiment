@@ -42,7 +42,7 @@ spec:
               type: array
             gpu_num:
               type: integer
-            mysql_secret:
+            id:
               type: string
             num:
               type: integer
@@ -72,7 +72,7 @@ spec:
           - command
           - datasets
           - gpu_num
-          - mysql_secret
+          - id
           - num
           - search_space
           - target
@@ -88,6 +88,8 @@ spec:
         status:
           description: DLExperimentStatus defines the observed state of DLExperiment
           properties:
+            count:
+              type: integer
             status:
               description: 'INSERT ADDITIONAL STATUS FIELD - define observed state
                 of cluster Important: Run "make" to regenerate code after modifying

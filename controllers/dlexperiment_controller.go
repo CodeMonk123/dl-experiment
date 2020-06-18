@@ -118,11 +118,13 @@ func (r *DLExperimentReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 		}
 		log.Info("create tuner pod successfully")
 		experiment.Status.Status = mlhubv1.ExperimentCreated
+		*experiment.Status.Count = 0
 		if err := r.Update(ctx, &experiment); err != nil {
 			log.Error(err, "unable to update experiment", "name", req.Name)
 			return ctrl.Result{}, err
 		}
 		log.Info("update experiment status", "status", mlhubv1.ExperimentCreated)
+		log.Info("update count", "count", 0)
 		return ctrl.Result{}, nil
 	} else if experiment.Status.Status == mlhubv1.ExperimentCreated {
 		// Check whether the tuner pod is available

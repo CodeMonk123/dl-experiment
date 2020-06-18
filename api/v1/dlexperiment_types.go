@@ -31,6 +31,7 @@ type DLExperimentSpec struct {
 	// Foo is an example field of DLExperiment. Edit DLExperiment_types.go to remove/update
 	User             string   `json:"user"`
 	Workspace        string   `json:"workspace"`
+	ID               string   `json:"id"`
 	Trainer          string   `json:"trainer"`
 	TrailConcurrency int      `json:"trial_concurrency"`
 	MaxTrialNum      int      `json:"num"`
@@ -43,7 +44,6 @@ type DLExperimentSpec struct {
 	TrialImage       string   `json:"trial_image"`
 	Datasets         []string `json:"datasets"`
 	WorkingDir       string   `json:"working_dir"`
-	MySQLSecret      string   `json:"mysql_secret"`
 }
 
 // DLExperimentStatus defines the observed state of DLExperiment
@@ -51,6 +51,7 @@ type DLExperimentStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 	Status string `json:"status,omitempty"`
+	Count  *int   `json:"count,omitempty"`
 }
 
 // +kubebuilder:object:root=true
