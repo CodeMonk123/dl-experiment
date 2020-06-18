@@ -70,20 +70,14 @@ spec:
               type: string
           required:
           - command
-          - datasets
-          - experiment_id
           - gpu_num
           - num
           - search_space
           - target
-          - trainer
           - trial_concurrency
           - trial_image
           - tuner
           - tuner_image
-          - user
-          - working_dir
-          - workspace
           type: object
         status:
           description: DLExperimentStatus defines the observed state of DLExperiment

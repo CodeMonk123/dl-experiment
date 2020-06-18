@@ -29,10 +29,10 @@ type DLExperimentSpec struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
 	// Foo is an example field of DLExperiment. Edit DLExperiment_types.go to remove/update
-	User             string   `json:"user"`
-	Workspace        string   `json:"workspace"`
-	ExperimentID     string   `json:"experiment_id"`
-	Trainer          string   `json:"trainer"`
+	User             string   `json:"user,omitempty"`
+	Workspace        string   `json:"workspace,omitempty"`
+	ExperimentID     string   `json:"experiment_id,omitempty"`
+	Trainer          string   `json:"trainer,omitempty"`
 	TrailConcurrency int      `json:"trial_concurrency"`
 	MaxTrialNum      int      `json:"num"`
 	Tuner            string   `json:"tuner"`
@@ -42,8 +42,8 @@ type DLExperimentSpec struct {
 	Command          string   `json:"command"`
 	TunerImage       string   `json:"tuner_image"`
 	TrialImage       string   `json:"trial_image"`
-	Datasets         []string `json:"datasets"`
-	WorkingDir       string   `json:"working_dir"`
+	Datasets         []string `json:"datasets,omitempty"`
+	WorkingDir       string   `json:"working_dir,omitempty"`
 }
 
 // DLExperimentStatus defines the observed state of DLExperiment
