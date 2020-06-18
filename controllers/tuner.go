@@ -23,7 +23,7 @@ func (r *DLExperimentReconciler) CreateTunerPod(ctx *context.Context, experiment
 					Command: []string{"python3", "main.py"},
 					Ports: []corev1.ContainerPort{{
 						ContainerPort: 8001,
-					},},
+					}},
 					Env: []corev1.EnvVar{
 						{
 							Name:  "TUNER",
