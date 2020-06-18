@@ -40,10 +40,10 @@ spec:
               items:
                 type: string
               type: array
+            experiment_id:
+              type: string
             gpu_num:
               type: integer
-            id:
-              type: string
             num:
               type: integer
             search_space:
@@ -71,8 +71,8 @@ spec:
           required:
           - command
           - datasets
+          - experiment_id
           - gpu_num
-          - id
           - num
           - search_space
           - target

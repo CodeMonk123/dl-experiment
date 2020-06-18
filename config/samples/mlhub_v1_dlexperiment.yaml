@@ -1,20 +1,20 @@
 apiVersion: mlhub.njuics.cn/v1
 kind: DLExperiment
 metadata:
-  name: dlexperiment-sample
+  name: dlexperiment-pt-sample
   namespace: dlkit-tuning
 spec:
   # Add fields here
   user: cuizihan
   workspace: pt-test
-  id: abcd1234
+  experiment_id: abcd1234
   trainer: pytorch
   trial_concurrency: 2
   num: 10
   tuner: random
   target: maximize
   gpu_num: 1
-  search_space: {\"epoch\":{\"_type\":\"choice\",\"_value\":[30,50,70,90]},\"lr\":{\"_type\":\"choice\",\"_value\":[0.1,0.01]},\"batch_size\":{\"_type\":\"choice\",\"_value\":[32,64,128]},\"momentum\":{\"_type\":\"choice\",\"_value\":[0.3,0.5,0.7,0.9]}}
+  search_space: "{\"epoch\":{\"_type\":\"choice\",\"_value\":[30,50,70,90]},\"lr\":{\"_type\":\"choice\",\"_value\":[0.1,0.01]},\"batch_size\":{\"_type\":\"choice\",\"_value\":[32,64,128]},\"momentum\":{\"_type\":\"choice\",\"_value\":[0.3,0.5,0.7,0.9]}}"
   command: python3 train.py --dataroot /workspace/cifar
   tuner_image: registry.cn-hangzhou.aliyuncs.com/njuicscn/dlkit-tuner:latest
   trial_image: registry.cn-hangzhou.aliyuncs.com/njuicscn/horovod:0.18.1-tf1.14.0-torch1.2.0-mxnet1.5.0-py3.6

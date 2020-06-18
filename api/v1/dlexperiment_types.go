@@ -31,7 +31,7 @@ type DLExperimentSpec struct {
 	// Foo is an example field of DLExperiment. Edit DLExperiment_types.go to remove/update
 	User             string   `json:"user"`
 	Workspace        string   `json:"workspace"`
-	ID               string   `json:"id"`
+	ExperimentID     string   `json:"experiment_id"`
 	Trainer          string   `json:"trainer"`
 	TrailConcurrency int      `json:"trial_concurrency"`
 	MaxTrialNum      int      `json:"num"`
