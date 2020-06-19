@@ -57,6 +57,7 @@ type DLExperimentStatus struct {
 // +kubebuilder:object:root=true
 
 // DLExperiment is the Schema for the dlexperiments API
+// +kubebuilder:subresource:status
 type DLExperiment struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

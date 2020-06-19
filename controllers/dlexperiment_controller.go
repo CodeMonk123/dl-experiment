@@ -56,7 +56,7 @@ type DLExperimentReconciler struct {
 }
 
 func NewDLExperimentReconciler(mgr manager.Manager) (*DLExperimentReconciler, error) {
-	kubeClient, err := setupClient()
+	kubeClient, err := setupKubeClient()
 	if err != nil {
 		return nil, err
 	}
@@ -118,13 +118,14 @@ func (r *DLExperimentReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 		}
 		log.Info("create tuner pod successfully")
 		experiment.Status.Status = mlhubv1.ExperimentCreated
-		*experiment.Status.Count = 0
+		var count int
+		experiment.Status.Count = &count
 		if err := r.Update(ctx, &experiment); err != nil {
 			log.Error(err, "unable to update experiment", "name", req.Name)
 			return ctrl.Result{}, err
 		}
 		log.Info("update experiment status", "status", mlhubv1.ExperimentCreated)
-		log.Info("update count", "count", 0)
+		log.Info("update count", "count", *experiment.Status.Count)
 		return ctrl.Result{}, nil
 	} else if experiment.Status.Status == mlhubv1.ExperimentCreated {
 		// Check whether the tuner pod is available
@@ -141,9 +142,11 @@ func (r *DLExperimentReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 		}
 
 		tunerIP := tunerPod.Status.PodIP
-		if !utils.TunerIsAvailable(tunerIP) {
+		log.Info("try to test tuner:", "pod ip", tunerIP)
+		if err := utils.TunerIsAvailable(tunerIP); err != nil {
 			log.Info("waiting for tuner launching...")
-			return ctrl.Result{}, nil
+			log.Error(err, "tuner is launching")
+			return ctrl.Result{Requeue: true}, nil
 		}
 
 		// tuner is available
@@ -152,7 +155,7 @@ func (r *DLExperimentReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 			log.Error(err, "unable to change experiment status to running")
 			return ctrl.Result{}, err
 		}
-		log.Info("change experiment status to ")
+		log.Info("change experiment status to running")
 		return ctrl.Result{}, nil
 	} else if experiment.Status.Status == mlhubv1.ExperimentRunning {
 		// judge whether to create a new trail according to the number of running trials.
@@ -168,6 +171,7 @@ func (r *DLExperimentReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 			runningJobs := 0
 			pendingJobs := 0
 			succeedJobs := 0
+			failedJobs := 0
 			for _, job := range tfjobs.Items {
 				if isRunning(job.Status) {
 					runningJobs += 1
@@ -175,6 +179,8 @@ func (r *DLExperimentReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 					pendingJobs += 1
 				} else if isSucceeded(job.Status) {
 					succeedJobs += 1
+				} else if isFailed(job.Status) {
+					failedJobs += 1
 				}
 			}
 
@@ -200,6 +206,7 @@ func (r *DLExperimentReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 			runningJobs := 0
 			pendingJobs := 0
 			succeedJobs := 0
+			failedJobs := 0
 			for _, job := range ptjobs.Items {
 				if isRunning(job.Status) {
 					runningJobs += 1
@@ -207,6 +214,8 @@ func (r *DLExperimentReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 					pendingJobs += 1
 				} else if isSucceeded(job.Status) {
 					succeedJobs += 1
+				} else if isFailed(job.Status) {
+					failedJobs += 1
 				}
 			}
 
@@ -236,7 +245,7 @@ func (r *DLExperimentReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func setupClient() (client.Client, error) {
+func setupKubeClient() (client.Client, error) {
 	cfg, err := config.GetConfig()
 	if err != nil {
 		return nil, err
