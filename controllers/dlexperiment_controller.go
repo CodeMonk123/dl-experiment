@@ -183,6 +183,16 @@ func (r *DLExperimentReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 			}
 			log.Info("tfjobs status", "experiment", experiment.Name, "status", fmt.Sprintf("running:%d,pending:%d,failed:%d,succeeded:%d", runningJobs, pendingJobs, failedJobs, succeedJobs))
 
+			if failedJobs != 0 {
+				log.Info("experiment failed", "experiment", experiment.Name)
+				experiment.Status.Status = mlhubv1.ExperimentFailed
+				if err := r.Status().Update(ctx, &experiment); err != nil {
+					log.Error(err, "uable to change experiment status to failed", "experiment", experiment.Name)
+					return ctrl.Result{}, err
+				}
+				return ctrl.Result{}, nil
+			}
+
 			if succeedJobs == experiment.Spec.MaxTrialNum {
 				// change experiment status to completed
 				experiment.Status.Status = mlhubv1.ExperimentCompleted
@@ -222,6 +232,16 @@ func (r *DLExperimentReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 			}
 
 			log.Info("ptjobs status", "experiment", experiment.Name, "status", fmt.Sprintf("running:%d,pending:%d,failed:%d,succeeded:%d", runningJobs, pendingJobs, failedJobs, succeedJobs))
+
+			if failedJobs != 0 {
+				log.Info("experiment failed", "experiment", experiment.Name)
+				experiment.Status.Status = mlhubv1.ExperimentFailed
+				if err := r.Status().Update(ctx, &experiment); err != nil {
+					log.Error(err, "uable to change experiment status to failed", "experiment", experiment.Name)
+					return ctrl.Result{}, err
+				}
+				return ctrl.Result{}, nil
+			}
 
 			if succeedJobs == experiment.Spec.MaxTrialNum {
 				// change experiment status to completed
@@ -326,7 +346,7 @@ func (r *DLExperimentReconciler) submitNewTrial(ctx *context.Context, experiment
 		}
 		log.Info("update experiment count", "experiment", experiment.Name, "count", *experiment.Status.Count)
 		// TODO: Store in database
-		
+
 	} else {
 		return fmt.Errorf("unsupported framework: %s", experiment.Spec.Trainer)
 	}

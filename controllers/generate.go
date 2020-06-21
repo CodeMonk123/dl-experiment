@@ -101,6 +101,7 @@ func generatePodSpec(experiment *mlhubv1.DLExperiment) corev1.PodSpec {
 				ImagePullPolicy: corev1.PullIfNotPresent,
 			},
 		},
+		NodeName:      "n33.njuics.cn",
 		RestartPolicy: corev1.RestartPolicyNever,
 	}
 
