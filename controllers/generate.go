@@ -58,6 +58,7 @@ func GenerateTfJob(experiment *mlhubv1.DLExperiment, trailID, reportURL, paramet
 
 func GeneratePytorchJob(experiment *mlhubv1.DLExperiment, trailID, reportURL, parameter string, index int) *pttypes.PyTorchJob {
 
+	return nil
 }
 
 func generatePodSpec(experiment *mlhubv1.DLExperiment) corev1.PodSpec {

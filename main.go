@@ -18,6 +18,8 @@ package main
 
 import (
 	"flag"
+	pytorchv1 "github.com/kubeflow/pytorch-operator/pkg/client/clientset/versioned/scheme"
+	tfv1 "github.com/kubeflow/tf-operator/pkg/client/clientset/versioned/scheme"
 	"github.com/nemoworks/dl-experiment/utils"
 	"os"
 
@@ -39,8 +41,9 @@ var (
 
 func init() {
 	_ = clientgoscheme.AddToScheme(scheme)
-
 	_ = mlhubv1.AddToScheme(scheme)
+	tfv1.AddToScheme(scheme)
+	pytorchv1.AddToScheme(scheme)
 	// +kubebuilder:scaffold:scheme
 }
 

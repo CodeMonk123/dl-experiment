@@ -26,7 +26,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
-	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/source"
@@ -296,6 +295,7 @@ func (r *DLExperimentReconciler) submitNewTrial(ctx *context.Context, experiment
 	// Create new job instance
 
 	// TODO: Store in database
+	return nil
 }
 
 func setupKubeClient() (client.Client, error) {
