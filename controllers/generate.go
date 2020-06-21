@@ -30,6 +30,7 @@ func GenerateTfJob(experiment *mlhubv1.DLExperiment, trailID, reportURL, paramet
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("tfjob-%s-exp-%s-trial-%s", experiment.Spec.Workspace, experiment.Spec.ExperimentID, trailID),
 			Namespace: experiment.Namespace,
+			Labels:    map[string]string{"owner": experiment.Name},
 		},
 		Spec: tftypes.TFJobSpec{
 			TFReplicaSpecs: map[tftypes.TFReplicaType]*tfcommon.ReplicaSpec{},
@@ -57,8 +58,36 @@ func GenerateTfJob(experiment *mlhubv1.DLExperiment, trailID, reportURL, paramet
 }
 
 func GeneratePytorchJob(experiment *mlhubv1.DLExperiment, trailID, reportURL, parameter string, index int) *pttypes.PyTorchJob {
+	pytorchjob := &pttypes.PyTorchJob{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("ptjob-%s-exp-%s-trial-%s", experiment.Spec.Workspace, experiment.Spec.ExperimentID, trailID),
+			Namespace: experiment.Namespace,
+			Labels:    map[string]string{"owner": experiment.Name},
+		},
+		Spec: pttypes.PyTorchJobSpec{
+			PyTorchReplicaSpecs: map[pttypes.PyTorchReplicaType]*tfcommon.ReplicaSpec{},
+		},
+	}
 
-	return nil
+	podSpec := generatePodSpec(experiment)
+
+	addEnvToPodSpec("TRIAL_ID", trailID, &podSpec)
+	addEnvToPodSpec("EXP_ID", experiment.Spec.ExperimentID, &podSpec)
+	addEnvToPodSpec("DLKIT_PARAM", parameter, &podSpec)
+	addEnvToPodSpec("SEQUENCE", fmt.Sprintf("%d", index), &podSpec)
+	addEnvToPodSpec("REPORT_URL", reportURL, &podSpec)
+
+	pytorchjob.Spec.PyTorchReplicaSpecs[pttypes.PyTorchReplicaTypeMaster] = &tfcommon.ReplicaSpec{
+		Replicas: tftypes.Int32(1),
+		Template: corev1.PodTemplateSpec{
+			Spec: podSpec,
+		},
+	}
+
+	pytorchjob.Spec.TTLSecondsAfterFinished = &defaultTFJobTTL
+	pytorchjob.Spec.BackoffLimit = &defaultBackoffLimits
+
+	return pytorchjob
 }
 
 func generatePodSpec(experiment *mlhubv1.DLExperiment) corev1.PodSpec {

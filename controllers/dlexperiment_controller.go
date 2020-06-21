@@ -25,7 +25,6 @@ import (
 	"github.com/nemoworks/dl-experiment/utils"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/source"
@@ -35,8 +34,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	pytorchv1 "github.com/kubeflow/pytorch-operator/pkg/client/clientset/versioned/scheme"
-	tfv1 "github.com/kubeflow/tf-operator/pkg/client/clientset/versioned/scheme"
 	mlhubv1 "github.com/nemoworks/dl-experiment/api/v1"
 	"github.com/nemoworks/dl-experiment/datastore"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -51,7 +48,6 @@ const (
 // DLExperimentReconciler reconciles a DLExperiment object
 type DLExperimentReconciler struct {
 	client.Client
-	KubeClient     client.Client
 	DBClient       *sql.DB
 	Log            logr.Logger
 	Scheme         *runtime.Scheme
@@ -59,10 +55,6 @@ type DLExperimentReconciler struct {
 }
 
 func NewDLExperimentReconciler(mgr manager.Manager) (*DLExperimentReconciler, error) {
-	kubeClient, err := setupKubeClient()
-	if err != nil {
-		return nil, err
-	}
 
 	dbClient, err := datastore.InitDBClient()
 	if err != nil {
@@ -71,7 +63,6 @@ func NewDLExperimentReconciler(mgr manager.Manager) (*DLExperimentReconciler, er
 
 	reconciler := DLExperimentReconciler{
 		Client:         mgr.GetClient(),
-		KubeClient:     kubeClient,
 		Log:            ctrl.Log.WithName("controllers").WithName("DLExperiment"),
 		Scheme:         mgr.GetScheme(),
 		DBClient:       dbClient,
@@ -168,7 +159,7 @@ func (r *DLExperimentReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 		// judge whether to create a new trail according to the number of running trials.
 		if experiment.Spec.Trainer == "tensorflow" {
 			tfjobs := tftypes.TFJobList{}
-			if err := r.KubeClient.List(context.TODO(), &tfjobs, client.MatchingLabels{"owner": req.Name}); err != nil {
+			if err := r.List(context.TODO(), &tfjobs, client.MatchingLabels{"owner": req.Name}); err != nil {
 				log.Error(err, "unable to list tfjobs owned by experiment "+req.Name)
 				return ctrl.Result{}, err
 			}
@@ -190,6 +181,7 @@ func (r *DLExperimentReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 					failedJobs += 1
 				}
 			}
+			log.Info("tfjobs status", "experiment", experiment.Name, "status", fmt.Sprintf("running:%d,pending:%d,failed:%d,succeeded:%d", runningJobs, pendingJobs, failedJobs, succeedJobs))
 
 			if succeedJobs == experiment.Spec.MaxTrialNum {
 				// change experiment status to completed
@@ -210,7 +202,7 @@ func (r *DLExperimentReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 
 		} else if experiment.Spec.Trainer == "pytorch" {
 			ptjobs := pttypes.PyTorchJobList{}
-			if err := r.KubeClient.List(context.TODO(), &ptjobs, client.MatchingLabels{"owner": req.Name}); err != nil {
+			if err := r.List(context.TODO(), &ptjobs, client.MatchingLabels{"owner": req.Name}); err != nil {
 				log.Error(err, "unable to list ptjobs owned by experiment "+req.Name)
 			}
 			runningJobs := 0
@@ -228,6 +220,8 @@ func (r *DLExperimentReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 					failedJobs += 1
 				}
 			}
+
+			log.Info("ptjobs status", "experiment", experiment.Name, "status", fmt.Sprintf("running:%d,pending:%d,failed:%d,succeeded:%d", runningJobs, pendingJobs, failedJobs, succeedJobs))
 
 			if succeedJobs == experiment.Spec.MaxTrialNum {
 				// change experiment status to completed
@@ -293,28 +287,49 @@ func (r *DLExperimentReconciler) submitNewTrial(ctx *context.Context, experiment
 	}
 	log.Info("get new param for trial", "index", *experiment.Status.Count, "param", newParam)
 	// Create new job instance
+	trailID := utils.GenerateUniqueString(8)
+	reportURL := fmt.Sprintf("http://%s:8001/api/v1/tuner", addr)
+	if experiment.Spec.Trainer == "pytorch" {
+		job := GeneratePytorchJob(experiment, trailID, reportURL, newParam, *experiment.Status.Count)
+		if err := ctrl.SetControllerReference(experiment, job, r.Scheme); err != nil {
+			log.Error(err, "uable to set controller reference")
+			return err
+		}
+		log.Info("set controller reference successfully")
+		if err := r.Create(*ctx, job); err != nil {
+			log.Error(err, "unable to create pytorch job", "experiment", experiment.Name)
+			return err
+		}
+		log.Info("create pytorch job successfully", "experiment", experiment.Name)
+		*experiment.Status.Count += 1
+		if err := r.Status().Update(*ctx, experiment); err != nil {
+			log.Error(err, "unable to update status", "experiment", experiment.Name)
+		}
+		log.Info("update experiment count", "experiment", experiment.Name, "count", *experiment.Status.Count)
+		// TODO: Store in database
 
-	// TODO: Store in database
+	} else if experiment.Spec.Trainer == "tensorflow" {
+		job := GenerateTfJob(experiment, trailID, reportURL, newParam, *experiment.Status.Count)
+		if err := ctrl.SetControllerReference(experiment, job, r.Scheme); err != nil {
+			log.Error(err, "uable to set controller reference")
+			return err
+		}
+		log.Info("set controller reference successfully")
+		if err := r.Create(*ctx, job); err != nil {
+			log.Error(err, "unable to create tf job", "experiment", experiment.Name)
+			return err
+		}
+		log.Info("create tf job successfully", "experiment", experiment.Name)
+		*experiment.Status.Count += 1
+		if err := r.Status().Update(*ctx, experiment); err != nil {
+			log.Error(err, "unable to update status", "experiment", experiment.Name)
+		}
+		log.Info("update experiment count", "experiment", experiment.Name, "count", *experiment.Status.Count)
+		// TODO: Store in database
+		
+	} else {
+		return fmt.Errorf("unsupported framework: %s", experiment.Spec.Trainer)
+	}
+
 	return nil
-}
-
-func setupKubeClient() (client.Client, error) {
-	cfg, err := config.GetConfig()
-	if err != nil {
-		return nil, err
-	}
-	scheme := newScheme()
-	kubeClient, err := client.New(cfg, client.Options{Scheme: scheme})
-	if err != nil {
-		return nil, err
-	}
-	return kubeClient, nil
-}
-
-func newScheme() *runtime.Scheme {
-	scheme := runtime.NewScheme()
-	tfv1.AddToScheme(scheme)
-	pytorchv1.AddToScheme(scheme)
-	corev1.AddToScheme(scheme)
-	return scheme
 }
