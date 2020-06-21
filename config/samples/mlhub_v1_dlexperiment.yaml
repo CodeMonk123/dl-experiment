@@ -16,7 +16,7 @@ spec:
   gpu_num: 1
   search_space: "{\"epoch\":{\"_type\":\"choice\",\"_value\":[30,50,70,90]},\"lr\":{\"_type\":\"choice\",\"_value\":[0.1,0.01]},\"batch_size\":{\"_type\":\"choice\",\"_value\":[32,64,128]},\"momentum\":{\"_type\":\"choice\",\"_value\":[0.3,0.5,0.7,0.9]}}"
   command: python3 train.py --dataroot /workspace/cifar
-  tuner_image: registry.cn-hangzhou.aliyuncs.com/njuicscn/dlkit-tuner:latest
+  tuner_image: registry.cn-hangzhou.aliyuncs.com/cuizihan/dlkit-tuner:latest
   trial_image: registry.cn-hangzhou.aliyuncs.com/njuicscn/horovod:0.18.1-tf1.14.0-torch1.2.0-mxnet1.5.0-py3.6
   datasets:
     - cifar

@@ -5,13 +5,13 @@ import (
 	"fmt"
 	mlhubv1 "github.com/nemoworks/dl-experiment/api/v1"
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
 func (r *DLExperimentReconciler) CreateTunerPod(ctx *context.Context, experiment *mlhubv1.DLExperiment) error {
 	tunerPod := corev1.Pod{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-tuner", experiment.Name),
 			Namespace: experiment.Namespace,
 		},
@@ -45,9 +45,9 @@ func (r *DLExperimentReconciler) CreateTunerPod(ctx *context.Context, experiment
 		},
 	}
 
-	if err := r.Create(*ctx, &tunerPod); err != nil {
+	if err := ctrl.SetControllerReference(experiment, &tunerPod, r.Scheme); err != nil {
 		return err
 	}
 
-	return ctrl.SetControllerReference(experiment, &tunerPod, r.Scheme)
+	return r.Create(*ctx, &tunerPod)
 }

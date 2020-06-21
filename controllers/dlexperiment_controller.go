@@ -26,7 +26,10 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -49,10 +52,11 @@ const (
 // DLExperimentReconciler reconciles a DLExperiment object
 type DLExperimentReconciler struct {
 	client.Client
-	KubeClient client.Client
-	DBClient   *sql.DB
-	Log        logr.Logger
-	Scheme     *runtime.Scheme
+	KubeClient     client.Client
+	DBClient       *sql.DB
+	Log            logr.Logger
+	Scheme         *runtime.Scheme
+	TunerAddrCache map[string]string
 }
 
 func NewDLExperimentReconciler(mgr manager.Manager) (*DLExperimentReconciler, error) {
@@ -67,11 +71,12 @@ func NewDLExperimentReconciler(mgr manager.Manager) (*DLExperimentReconciler, er
 	}
 
 	reconciler := DLExperimentReconciler{
-		Client:     mgr.GetClient(),
-		KubeClient: kubeClient,
-		Log:        ctrl.Log.WithName("controllers").WithName("DLExperiment"),
-		Scheme:     mgr.GetScheme(),
-		DBClient:   dbClient,
+		Client:         mgr.GetClient(),
+		KubeClient:     kubeClient,
+		Log:            ctrl.Log.WithName("controllers").WithName("DLExperiment"),
+		Scheme:         mgr.GetScheme(),
+		DBClient:       dbClient,
+		TunerAddrCache: make(map[string]string),
 	}
 
 	return &reconciler, nil
@@ -120,13 +125,13 @@ func (r *DLExperimentReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 		experiment.Status.Status = mlhubv1.ExperimentCreated
 		var count int
 		experiment.Status.Count = &count
-		if err := r.Update(ctx, &experiment); err != nil {
+		if err := r.Status().Update(ctx, &experiment); err != nil {
 			log.Error(err, "unable to update experiment", "name", req.Name)
 			return ctrl.Result{}, err
 		}
 		log.Info("update experiment status", "status", mlhubv1.ExperimentCreated)
 		log.Info("update count", "count", *experiment.Status.Count)
-		return ctrl.Result{}, nil
+		return ctrl.Result{Requeue: true}, nil
 	} else if experiment.Status.Status == mlhubv1.ExperimentCreated {
 		// Check whether the tuner pod is available
 		// if not, do nothing
@@ -151,12 +156,15 @@ func (r *DLExperimentReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 
 		// tuner is available
 		experiment.Status.Status = mlhubv1.ExperimentRunning
-		if err := r.Update(ctx, &experiment); err != nil {
+		if _, ok := r.TunerAddrCache[tunerPodName]; !ok {
+			r.TunerAddrCache[tunerPodName] = tunerIP
+		}
+		if err := r.Status().Update(ctx, &experiment); err != nil {
 			log.Error(err, "unable to change experiment status to running")
 			return ctrl.Result{}, err
 		}
 		log.Info("change experiment status to running")
-		return ctrl.Result{}, nil
+		return ctrl.Result{Requeue: true}, nil
 	} else if experiment.Status.Status == mlhubv1.ExperimentRunning {
 		// judge whether to create a new trail according to the number of running trials.
 		if experiment.Spec.Trainer == "tensorflow" {
@@ -187,15 +195,18 @@ func (r *DLExperimentReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 			if succeedJobs == experiment.Spec.MaxTrialNum {
 				// change experiment status to completed
 				experiment.Status.Status = mlhubv1.ExperimentCompleted
-				if err := r.Update(ctx, &experiment); err != nil {
+				if err := r.Status().Update(ctx, &experiment); err != nil {
 					log.Error(err, "unable to change experiment status to completed")
 					return ctrl.Result{}, err
 				}
 				return ctrl.Result{}, nil
 			} else if runningJobs+pendingJobs < experiment.Spec.TrailConcurrency {
-				// TODO: create a new trial
-				nextIndex := runningJobs + pendingJobs
-				log.Info("will create new trail", "index", nextIndex)
+				log.Info("will create new trail", "index", *experiment.Status.Count)
+				if err := r.submitNewTrial(&ctx, &experiment, log); err != nil {
+					log.Error(err, "unable to submit new tensorflow job")
+					return ctrl.Result{}, err
+				}
+				return ctrl.Result{}, nil
 			}
 
 		} else if experiment.Spec.Trainer == "pytorch" {
@@ -222,15 +233,18 @@ func (r *DLExperimentReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 			if succeedJobs == experiment.Spec.MaxTrialNum {
 				// change experiment status to completed
 				experiment.Status.Status = mlhubv1.ExperimentCompleted
-				if err := r.Update(ctx, &experiment); err != nil {
+				if err := r.Status().Update(ctx, &experiment); err != nil {
 					log.Error(err, "unable to change experiment status to completed")
 					return ctrl.Result{}, err
 				}
 				return ctrl.Result{}, nil
 			} else if runningJobs+pendingJobs < experiment.Spec.TrailConcurrency {
-				// TODO: create a new trial
-				nextIndex := runningJobs + pendingJobs
-				log.Info("will create new trail", "index", nextIndex)
+				log.Info("will create new trail", "index", *experiment.Status.Count)
+				if err := r.submitNewTrial(&ctx, &experiment, log); err != nil {
+					log.Error(err, "unable to submit new tensorflow job")
+					return ctrl.Result{}, err
+				}
+				return ctrl.Result{}, nil
 			}
 
 		}
@@ -240,9 +254,48 @@ func (r *DLExperimentReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 }
 
 func (r *DLExperimentReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	// watch sub resources
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&mlhubv1.DLExperiment{}).
+		Watches(&source.Kind{Type: &corev1.Pod{}}, &handler.EnqueueRequestForOwner{
+			OwnerType:    &mlhubv1.DLExperiment{},
+			IsController: true,
+		}).
+		Watches(&source.Kind{Type: &tftypes.TFJob{}}, &handler.EnqueueRequestForOwner{
+			OwnerType:    &mlhubv1.DLExperiment{},
+			IsController: true,
+		}).
+		Watches(&source.Kind{Type: &pttypes.PyTorchJob{}}, &handler.EnqueueRequestForOwner{
+			OwnerType:    &mlhubv1.DLExperiment{},
+			IsController: true,
+		}).
 		Complete(r)
+}
+
+func (r *DLExperimentReconciler) submitNewTrial(ctx *context.Context, experiment *mlhubv1.DLExperiment, log logr.Logger) error {
+	// Get new param from tuner
+	tunerPodName := fmt.Sprintf("%s-tuner", experiment.Name)
+	addr, ok := r.TunerAddrCache[tunerPodName]
+	if !ok {
+		log.Info("tuner ip not in addr cache")
+		var tunerPod corev1.Pod
+		if err := r.Get(*ctx, client.ObjectKey{
+			Namespace: experiment.Namespace,
+			Name:      tunerPodName,
+		}, &tunerPod); err != nil {
+			return err
+		}
+		addr = tunerPod.Status.PodIP
+	}
+
+	newParam, err := utils.GetNewParamFromTuner(addr, *experiment.Status.Count)
+	if err != nil {
+		return err
+	}
+	log.Info("get new param for trial", "index", *experiment.Status.Count, "param", newParam)
+	// Create new job instance
+
+	// TODO: Store in database
 }
 
 func setupKubeClient() (client.Client, error) {
